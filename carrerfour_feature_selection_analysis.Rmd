@@ -1,0 +1,475 @@
+---
+title: "carrerfourfeatureSelection"
+author: "Bill"
+date: "11/13/2020"
+output: html_document
+---
+
+
+
+# 1. Problem Definition
+
+## 1.1 Defining the Question
+
+As a Data analyst at Carrefour Kenya,I have been consulted to undertake a project that will inform the marketing department on the most relevant marketing strategies that will result in the highest no. of sales (total price including tax). My  project will explore a recent marketing dataset provided by performing various unsupervised learning techniques and later providing recommendations based on my insights.
+
+## 1.2 Specifying the Question
+ I am expected to reduce the  dataset provided to a low dimensional dataset using the t-SNE algorithm or PCA, then perform  analysis and provide insights gained from my  analysis.
+
+## 1.3  Defining the Metric of Success
+- Reducing the dataset using PCA and t-SNE and getting the most effective/useful features
+- Analysis that will enable the marketing department increase their total sales
+
+## 1.4 Understanding the Context
+
+Carrefour, one of the largest hypermarket chains in the world was introduced to the Middle East and North Africa (MENA) market in 1995 by Majid Al Futtaim, the leading shopping mall, retail and leisure pioneer across MENA.
+
+Carrefour has become the most dynamic, fast-moving and exciting hypermarket chain in the region and shared its growth with more than 38,000 employees from more than 70 nationalities in 15 countries, providing shoppers with variety and value-for-money. 
+
+Carrefour ensures customer satisfaction and everyday convenience while offering unbeatable value for money with a vast array of more than 100,000 products, shoppers can purchase items for their every need, whether home electronics or fresh fruits from around the world, to locally produced items. 
+
+Carrefour opened its first outlet in Kenya in 2016, and currently operates over 250 hypermarkets, supermarkets, and online stores in 15 countries across the region, with plans to extend into 38 countries in the Middle East, Central Asia, Africa and Russia.
+
+Carrefour always strive to provide the best quality and most diverse selection of household goods available in Kenya. Our value packs and combination discount offers means that we can offer these products at even lower costs, keeping your household essentials at unbeatable prices.
+
+
+## 1.5 Experimental Design taken
+1. Data Exploration
+2. Data Cleaning and Formatting
+3. Univariate Analysis
+4. Bivariate Analysis
+5. Multivariate Analysis
+6. Feature Selection
+6. Conclusion and Next steps
+# 2. Data Sourcing
+The data was availed to our data science team by the  Carrefour’s Sales and Marketing team therefore no data collection and scrapping was needed...We will just load our dataset in RStudio and begin the analysis process
+# 3. Check the Data
+``` {r}
+## Loading packages that we will use during our analysis
+library("dplyr")
+library("purrr")
+library('tidyverse')
+library('magrittr')
+library('corrplot')
+library('caret')
+library('skimr')
+library(readr)
+
+```
+
+``` {r}
+Supermarket_Dataset<- read_csv("datasets/Supermarket_Dataset_1 - Sales Data.csv")
+
+## previewing first 6 rows
+head(Supermarket_Dataset)
+
+##previewing the last 6 rows of the dataset
+tail(Supermarket_Dataset)
+```
+
+
+``` {r}
+## Previewing the shape of our dataset
+dim(Supermarket_Dataset)
+### we have 1000  rows and 16 columns!!!BAM!!
+
+#checking the datatypes on the columns 
+sapply(Supermarket_Dataset, class)
+### Our dataset is comprised of numeric and character data types and one datetime
+##checking for structure is using the str()
+str(Supermarket_Dataset)
+
+## We then a statistical summary of our dataset
+
+summary(Supermarket_Dataset)
+
+```
+
+
+## Appropriateness of Our Dataset
+
+The dataset contains 1000  rows and 16 columns which is sufficient enough for perfoming our analysis..We have 16 features which we will be forced to reduce them to  a small number using PCA and t-SNE
+
+
+# 4. Perform Data Cleaning
+
+## To ensure uniformity, I will lowercase all the columns
+``` {r}
+names(Supermarket_Dataset)<- tolower(names(Supermarket_Dataset))
+head(Supermarket_Dataset) 
+
+
+```
+
+NEXT I'm going to checking for missing values in our dataset,,Missing values may affect the perfomance of our model, so we will find a way to deal with them
+
+``` {r}
+##Checking for missing values in each row
+colSums(is.na(Supermarket_Dataset))
+
+```
+
+There are no missing values in our dataset...The Company did a pretty good job in data collection and data entry
+
+So far so good!!! Lets now check for duplicates in our dataset,,,This may arise due to mistakes incurred during data collection and data entry.. R gives us better ways of dealing and checking duplicates,,,Lets explore them below
+
+``` {r}
+anyDuplicated(Supermarket_Dataset)
+
+```
+We also dont have duplicates in our dataset,,,,Nice
+
+Next we are going to check for outliers in our numerical data,,This can be very extremely high or low values in our dataset that needs investigation...We only check for outliers in our numerical columns
+
+``` {r}
+## obtaining numerical columns
+numeric_columns <- unlist(lapply(Supermarket_Dataset, is.numeric))
+
+numeric_columns
+## I will put the numerical columns in a dataframe
+
+columns_numeric <- Supermarket_Dataset[ , numeric_columns]
+
+head(columns_numeric)
+
+```
+
+```{r}
+# using a for lop, I will output boxplots of numerical columns..This will help me to identify the outliers
+
+par ( mfrow= c (  2, 4 ))
+for (i in 1 : length (columns_numeric)) {
+boxplot (columns_numeric[,i], main= names (columns_numeric[i]), type= "l" )
+}
+```
+
+From the boxplots, outliers are present in the tax, cogs, gross income and totals columns....Dropping this outliers may affect our analysis as the extreme values might be genuine records..So I will not drop any outliers
+
+
+Next We will check anomalies and inconsistenicies in our dataframe....Since we have categorical column, we will need to convert them to factors
+
+
+``` {r}
+lengths(lapply(Supermarket_Dataset, unique))
+
+
+```
+
+Our values seems fine......There is no need for an alarm
+
+## Univariate Analysis
+Here we analyse single variables by checking the measures of central tendency and measures of dispersion...
+Lets begin with measures of central tendency 
+
+``` {r}
+## Getting the mean of all numerical columns
+colMeans(columns_numeric)
+
+```
+##Median
+``` {r}
+apply(columns_numeric,2,median)
+
+```
+
+### Mode
+
+``` {r}
+
+getmode <- function(v) {
+   uniqv <- unique(v)
+   uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+
+##getting the mode of all our numerical columns
+apply(columns_numeric,2,getmode)
+
+```
+
+##Measures of Dispersion
+
+``` {r}
+## we will do this by finding the statistical summary
+summary(Supermarket_Dataset)
+
+
+```
+
+## Standard Deviation
+``` {r}
+apply(columns_numeric,2,sd)
+
+```
+
+## Variance
+``` {r}
+
+sapply(columns_numeric, var)
+
+```
+
+
+## Bivariate and Multivariate Analysis
+I Will check for the corelation of all our numerical columns
+
+##Correlation matrix of all numerical columns
+``` {r}
+
+corr <- cor(columns_numeric, method = "pearson")
+
+round(corr, 2)
+
+```
+
+## Observations
+
+Unit price has a strong positive correlation with total of 0.63
+quantity has a strong positive correlation with total of 0.71    
+tax, gross income and cogs are strongly correlated to total with a correlation of 1
+
+## Implementing the Solution
+
+## Feature Selection
+Feature selection (or variable selection attribute selection) is the process done before model construction where a subset of relevant features are selected. The process reduces the no. of features in a dataset by excluding or including them without any change as opposed to dimensionality reduction methods which do so by creating new combinations of features.
+``` {r}
+head(columns_numeric)
+
+df<- columns_numeric[,c(1,2,3,4,6,7,8)]
+head(df)
+
+```
+
+## Filter Methods 
+# ---
+# We can use the findCorrelation function included in the caret package to create a subset of variabes. 
+# This function would allows us to remove redundancy by correlation using the given dataset. 
+# It would search through a correlation matrix and return a vector of integers corresponding to the columns, 
+# to remove or reduce pair-wise correlations.
+# ---
+
+``` {r}
+library(caret)
+### loading the corrplot package for plotting
+
+library(corrplot)
+
+```
+
+
+``` {r}
+# Calculating the correlation matrix
+# ---
+#
+new_df<- df
+
+correlationMatrix <- cor(df)
+correlationMatrix
+
+# Find attributes that are highly correlated
+# ---
+#
+highlyCorrelated <- findCorrelation(correlationMatrix, cutoff=0.7)
+
+# Highly correlated attributes
+# ---
+# 
+highlyCorrelated
+
+names(df[,highlyCorrelated])
+
+```
+
+
+
+## Observations
+- the cogs, total, tax and gross income columns are highly correlated
+
+
+``` {r}
+# We can remove the variables with a higher correlation 
+# and comparing the results graphically as shown below
+# ---
+# 
+# Removing Redundant Features 
+# ---
+# 
+df2<-df[-highlyCorrelated]
+
+# Performing our graphical comparison
+# ---
+# 
+par(mfrow = c(1, 2))
+
+corrplot(correlationMatrix, order = "hclust")
+
+
+corrplot(cor(df2), order = "hclust")
+```
+
+## Wrapper Methods 
+# Example 2: Wrapper Methods 
+# ---
+# We use the clustvarsel package that contains an implementation of wrapper methods. 
+# The clustvarsel function will implement variable section methodology 
+# for model-based clustering to find the optimal subset of variables in a dataset.
+# ---
+
+``` {r}
+##loading our clustvarsel package
+library(clustvarsel)
+#loading our mclust package
+library(mclust)
+
+
+
+```
+
+``` {r}
+head(df2)
+
+
+# Sequential forward greedy search (default)
+# ---
+#
+out = clustvarsel(df2, G = 1:5)
+out
+
+```
+
+
+
+
+``` {r}
+# The selection algorithm would indicate that the subset 
+# we use for the clustering model is composed of variables X1 and X2 
+# and that other variables should be rejected. 
+# Having identified the variables that we use, we proceed to build the clustering model:
+# ---
+#
+
+Subset1 = df2[,out$subset]
+mod = Mclust(Subset1, G = 1:5)
+summary(mod)
+
+```
+
+``` {r}
+plot(mod,c("classification"))
+
+```
+
+Conclusions
+- Our quantity and unit price were selected to be the most important features
+
+## Embedded Methods
+
+# ---
+# We will use the ewkm function from the wskm package.
+# This is a weighted subspace clustering algorithm that is well suited to very high dimensional data.
+# ---
+
+
+``` {r}
+library(wskm)
+set.seed(2)
+model <- ewkm(df_new, 3, lambda=2, maxiter=1000)
+
+```
+
+``` {r}
+library("cluster")
+
+# Cluster Plot against 1st 2 principal components
+# ---
+#
+clusplot(df_new, model$cluster, color=TRUE, shade=TRUE,
+         labels=2, lines=1,main='Cluster Analysis for Supermarket')
+
+
+```
+
+``` {r}
+# Weights are calculated for each variable and cluster. 
+# They are a measure of the relative importance of each variable 
+# with regards to the membership of the observations to that cluster. 
+# The weights are incorporated into the distance function, 
+# typically reducing the distance for more important variables.
+# Weights remain stored in the model and we can check them as follows:
+# 
+round(model$weights*100,2)
+
+```
+
+## Feature Ranking
+
+# ---
+# We will use the FSelector Package. This is a package containing functions for selecting attributes from a given dataset. 
+# ---
+
+``` {r}
+library(FSelector)
+
+head(df)
+
+```
+
+``` {r}
+# From the FSelector package, we use the correlation coefficient as a unit of valuation. 
+# This would be one of the several algorithms contained 
+# in the FSelector package that can be used rank the variables.
+# ---
+# 
+Scores <- linear.correlation(total~., df)
+
+Scores
+
+```
+
+``` {r}
+# From the output above, we observe a list containing 
+# rows of variables on the left and score on the right. 
+# In order to make a decision, we define a cutoff 
+# i.e. suppose we want to use the top 5 representative variables, 
+# through the use of the cutoff.k function included in the FSelector package. 
+# Alternatively, we could define our cutoff visually 
+# but in cases where there are few variables than in high dimensional datasets.
+# 
+# cutoff.k: The algorithms select a subset from a ranked attributes. 
+# ---
+#
+Subset <- cutoff.k(Scores, 5)
+as.data.frame(Subset)
+
+```
+``` {r}
+# We could also set cutoff as a percentage which would indicate 
+# that we would want to work with the percentage of the best variables.
+# ---
+#
+Subset2 <-cutoff.k.percent(Scores, 0.6)
+as.data.frame(Subset2)
+
+```
+
+``` {r}
+# Instead of using the scores for the correlation coefficient, 
+# we can use an entropy - based approach as shown below;
+# ---
+# 
+Scores2 <- information.gain(total~., df)
+
+# Choosing Variables by cutoffSubset <- cutoff.k(Scores2, 5)
+# ---
+# 
+Subset3 <- cutoff.k(Scores2, 5)
+as.data.frame(Subset3)
+
+```
+
+## Conclusions
+- Our 5 important features are:
+1. tax
+2. cogs
+3. gross income
+4. quantity
+5. unit price
